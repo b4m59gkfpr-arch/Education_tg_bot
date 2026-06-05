@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="panel info" style="margin-bottom: 20px;">
+  <h2>Управление группами</h2>
+  <p>Чтобы начать работу с тестами и конспектами, выберите существующую группу или создайте новую. Каждая группа имеет изолированные данные.</p>
+</div>
+
+<section class="grid">
+  <!-- Create Group Form -->
+  <form class="panel" method="post" action="{{ url_for('create_group_route') }}">
+    <h2>Создать новую группу</h2>
+    <label style="display: block; margin-top: 15px;">
+      Название группы
+      <input name="name" placeholder="Например: 2509" required style="width: 100%; margin-top: 5px;">
+    </label>
+    <button type="submit" style="width: 100%; margin-top: 20px;">Создать группу</button>
+  </form>
+
+  <!-- Groups List -->
+  <div class="panel">
+    <h2>Ваши группы</h2>
+    {% if groups %}
+      <ul class="subject-list" style="margin-top: 15px; list-style: none;">
+        {% for group in groups %}
+          <li class="subject-item" style="display: flex; flex-direction: column; padding: 15px 0; border-bottom: 1px solid var(--border-light);">
+            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+              <span style="font-weight: 600; font-size: 16px;">
+                Группа {{ group.name }}
+                {% if session.active_group_id == group.id %}
+                  <span style="font-size: 12px; background: var(--green-muted); color: var(--green); padding: 2px 8px; border-radius: 12px; margin-left: 8px; font-weight: normal;">Активна</span>
+                {% endif %}
+              </span>
+              <div style="display: flex; gap: 8px;">
+                {% if session.active_group_id != group.id %}
+                  <form method="post" action="{{ url_for('select_group_route', group_id=group.id) }}">
+                    <button type="submit" class="btn-select" style="background: var(--accent); color: white; border: none; padding: 5px 12px; border-radius: var(--radius-sm); cursor: pointer;">Выбрать</button>
+                  </form>
+                {% endif %}
+                <form method="post" action="{{ url_for('remove_group_route', group_id=group.id) }}" onsubmit="return confirm('Вы действительно хотите удалить группу {{ group.name }}? Это удалит все связанные тесты, предметы и конспекты!');">
+                  <button type="submit" class="btn-delete" style="background: var(--red-muted); color: var(--red); border: 1px solid var(--red); padding: 5px 12px; border-radius: var(--radius-sm); cursor: pointer;">Удалить</button>
+                </form>
+              </div>
+            </div>
+            <!-- Ссылка-приглашение -->
+            <div style="margin-top: 8px; font-size: 13px; color: var(--text-secondary); display: flex; align-items: center; gap: 8px; background: var(--surface-2); padding: 6px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-light);">
+              <span>Ссылка-приглашение:</span>
+              <a href="https://t.me/{{ bot_username }}?start={{ group.id }}" target="_blank" style="color: var(--accent); text-decoration: none; word-break: break-all; font-family: monospace;">
+                https://t.me/{{ bot_username }}?start={{ group.id }}
+              </a>
+              <button onclick="navigator.clipboard.writeText('https://t.me/{{ bot_username }}?start={{ group.id }}'); alert('Ссылка скопирована в буфер обмена!');" type="button" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 2px 5px; font-size: 11px; text-decoration: underline;">
+                Копировать
+              </button>
+            </div>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="empty" style="margin-top: 20px; color: var(--text-secondary); text-align: center;">У вас пока нет созданных групп.</p>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

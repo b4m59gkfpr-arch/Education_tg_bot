@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="max-width: 400px; margin: 60px auto;">
+  <form class="panel" method="post" action="{{ url_for('verify') }}">
+    <h2 style="margin-bottom: 15px; text-align: center;">Подтверждение почты</h2>
+    <p style="font-size: 14px; color: var(--text-secondary); text-align: center; margin-bottom: 20px;">
+      Мы отправили код подтверждения на указанный email. Пожалуйста, введите его ниже для активации аккаунта.
+    </p>
+    
+    <label style="display: block; margin-bottom: 20px;">
+      Код подтверждения (6 цифр)
+      <input type="text" name="code" placeholder="123456" maxlength="6" required style="width: 100%; margin-top: 5px; text-align: center; font-size: 20px; letter-spacing: 5px; padding: 10px;">
+    </label>
+    
+    <div style="font-size: 12px; color: var(--accent); background: var(--accent-muted); padding: 10px; border-radius: var(--radius); margin-bottom: 20px; text-align: center; border: 1px solid rgba(88,166,255,.2);">
+      ℹ️ Для локального тестирования код подтверждения выведен в консоль/терминал Flask-сервера.
+    </div>
+    
+    <button type="submit" style="width: 100%; padding: 10px;">Подтвердить</button>
+  </form>
+</div>
+{% endblock %}

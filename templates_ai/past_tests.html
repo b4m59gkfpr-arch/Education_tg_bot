@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="stats">
+  <div><strong>{{ counts.generated_tests }}</strong><span>AI-тесты</span></div>
+  <div><strong>{{ counts.questions }}</strong><span>Вопросы</span></div>
+  <div><strong>{{ counts.notes }}</strong><span>Конспекты</span></div>
+  <div><strong>{{ counts.results }}</strong><span>Результаты</span></div>
+</section>
+
+<section class="panel">
+  <h2>Прошлые тесты</h2>
+  {% if generated_tests %}
+    <table>
+      <thead>
+        <tr>
+          <th>Дата</th>
+          <th>Предмет</th>
+          <th>Название</th>
+          <th style="width: 140px;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for test in generated_tests %}
+          <tr>
+            <td>{{ test.created_at }}</td>
+            <td>{{ test.subject_name }}</td>
+            <td>{{ test.title }}</td>
+            <td>
+              <div class="actions">
+                <a class="table-link" href="{{ url_for('show_generated_test', generated_test_id=test.id) }}">Открыть</a>
+                <form method="post" action="{{ url_for('remove_generated_test', generated_test_id=test.id) }}" onsubmit="return confirm('Удалить этот тест?');">
+                  <button type="submit" class="btn-delete">Удалить</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="empty">Сохраненных AI-тестов пока нет.</p>
+  {% endif %}
+</section>
+{% endblock %}

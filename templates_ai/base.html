@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>StudyBot AI</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script>
+    // Apply saved theme before paint to prevent flash
+    (function() {
+      var theme = localStorage.getItem('theme') || 'dark';
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <h1>StudyBot AI</h1>
+    <div class="topbar-right">
+      <nav class="nav">
+        {% if session.teacher_id %}
+          {% if session.active_group_id %}
+            <a class="{{ 'active' if active_page == 'new_test' else '' }}" href="{{ url_for('new_test') }}">Новый тест</a>
+            <a class="{{ 'active' if active_page == 'past_tests' else '' }}" href="{{ url_for('past_tests') }}">Прошлые тесты</a>
+          {% endif %}
+          <a class="{{ 'active' if active_page == 'groups' else '' }}" href="{{ url_for('groups_route') }}">
+            {% if active_group_name %}
+              Группа: {{ active_group_name }}
+            {% else %}
+              Выбрать группу
+            {% endif %}
+          </a>
+          <span style="font-size: 14px; color: var(--text-secondary); margin-left: 10px; align-self: center;">{{ teacher_email }}</span>
+          <a href="{{ url_for('logout') }}" style="color: var(--red); font-weight: 500; margin-left: 10px; text-decoration: none;">Выйти</a>
+        {% else %}
+          <a href="{{ url_for('login') }}">Войти</a>
+          <a href="{{ url_for('register') }}" style="font-weight: 500;">Регистрация</a>
+        {% endif %}
+      </nav>
+      <button type="button" class="theme-toggle" id="themeToggle" title="Переключить тему">
+        <svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="page">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="messages">
+          {% for category, message in messages %}
+            <div class="message {{ category }}">{{ message }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+  </main>
+
+  <script>
+    document.getElementById('themeToggle').addEventListener('click', function() {
+      var current = document.documentElement.getAttribute('data-theme');
+      var next = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem('theme', next);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="stats">
+  <div><strong>{{ counts.subjects }}</strong><span>Предметы</span></div>
+  <div><strong>{{ counts.questions }}</strong><span>Вопросы</span></div>
+  <div><strong>{{ counts.generated_tests }}</strong><span>AI-тесты</span></div>
+  <div><strong>{{ counts.users }}</strong><span>Студенты</span></div>
+</section>
+
+<section class="grid">
+  <form class="panel" method="post" action="{{ url_for('create_subject') }}">
+    <h2>Добавить предмет</h2>
+    <label>
+      Название
+      <input name="name" placeholder="Например: ООП" required>
+    </label>
+    <button type="submit">Добавить</button>
+  </form>
+
+  <div class="panel">
+    <h2>Предметы в базе</h2>
+    {% if subjects %}
+      <ul class="subject-list">
+        {% for subject in subjects %}
+          <li class="subject-item">
+            <span>{{ subject.name }}</span>
+            <form method="post" action="{{ url_for('remove_subject', subject_id=subject.id) }}" onsubmit="return confirm('Удаление предмета удалит ВСЕ связанные вопросы, конспекты и тесты! Продолжить?');">
+              <button type="submit" class="btn-delete">Удалить</button>
+            </form>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="empty">Предметов пока нет.</p>
+    {% endif %}
+  </div>
+</section>
+
+<div class="panel info" style="margin-bottom: 20px;">
+  <h2>Как работает AI</h2>
+  <p>Выберите предмет, вставьте материал лекции или загрузите текстовый файл. AI создаст конспект и тестовые вопросы.</p>
+  <p>Перед использованием рекомендуем проверить сгенерированные ответы вручную.</p>
+</div>
+
+<form class="panel wide" method="post" action="{{ url_for('generate_test') }}" enctype="multipart/form-data">
+  <h2>Новый тест из материала</h2>
+  <div class="question-grid">
+    <label>
+      Предмет
+      <select name="subject_id" required>
+        <option value="">Выберите предмет</option>
+        {% for subject in subjects %}
+          <option value="{{ subject.id }}">{{ subject.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      Количество вопросов
+      <input name="question_count" type="number" min="1" max="10" value="5" required>
+    </label>
+  </div>
+  <label>
+    Название теста
+    <input name="title" placeholder="Например: Инкапсуляция и наследование" required>
+  </label>
+  <label>
+    Материал лекции
+    <textarea name="material" rows="10" placeholder="Вставьте сюда текст лекции или конспекта"></textarea>
+  </label>
+  <label>
+    Или загрузите .txt / .md / .pdf файл
+    <input name="material_file" type="file" accept=".txt,.md,.pdf,text/plain,text/markdown,application/pdf">
+  </label>
+  <div class="question-grid" style="margin-top: 10px; margin-bottom: 15px;">
+    <label>
+      Начальная страница PDF (с 1)
+      <input name="pdf_start_page" type="number" min="1" placeholder="По умолчанию: 1">
+    </label>
+    <label>
+      Конечная страница PDF
+      <input name="pdf_end_page" type="number" min="1" placeholder="По умолчанию: до конца">
+    </label>
+  </div>
+  <button type="submit">Создать тест через AI</button>
+</form>
+
+<section class="panel">
+  <h2>Вопросы в базе</h2>
+  {% if questions %}
+    <table>
+      <thead>
+        <tr>
+          <th>Предмет</th>
+          <th>Вопрос</th>
+          <th>Ответ</th>
+          <th style="width: 80px;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for question in questions %}
+          <tr>
+            <td>{{ question.subject_name }}</td>
+            <td>{{ question.question }}</td>
+            <td>{{ question.correct_answer }}</td>
+            <td>
+              <div class="actions">
+                <form method="post" action="{{ url_for('remove_question', question_id=question.id) }}" onsubmit="return confirm('Удалить этот вопрос?');">
+                  <button type="submit" class="btn-delete">Удалить</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="empty">Вопросов пока нет.</p>
+  {% endif %}
+</section>
+
+<section class="panel" style="margin-top: 20px;">
+  <h2>Студенты в группе ({{ students|length }})</h2>
+  {% if students %}
+    <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
+      <thead>
+        <tr style="border-bottom: 1px solid var(--border); text-align: left;">
+          <th style="padding: 10px 8px;">ФИО студента</th>
+          <th style="padding: 10px 8px;">Telegram Username</th>
+          <th style="padding: 10px 8px; width: 180px;">Дата входа</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for student in students %}
+          <tr style="border-bottom: 1px solid var(--border-light);">
+            <td style="padding: 10px 8px; font-weight: 600; color: var(--text);">{{ student.full_name }}</td>
+            <td style="padding: 10px 8px; color: var(--accent);">@{{ student.username }}</td>
+            <td style="padding: 10px 8px; color: var(--text-secondary); font-size: 13px;">{{ student.created_at }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="empty" style="margin-top: 15px;">Студентов в этой группе пока нет.</p>
+  {% endif %}
+</section>
+{% endblock %}
