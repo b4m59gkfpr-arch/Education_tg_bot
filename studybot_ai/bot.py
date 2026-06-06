@@ -55,10 +55,15 @@ main_keyboard = ReplyKeyboardMarkup(
 
 def get_groups_keyboard() -> InlineKeyboardMarkup:
     groups = list_all_groups()
-    buttons = [
-        [InlineKeyboardButton(text=f"Группа {g['name']}", callback_data=f"select_group:{g['id']}")]
-        for g in groups
-    ]
+    buttons = []
+    for g in groups:
+        teacher_label = g.get("teacher_name") or g.get("teacher_email") or "Неизвестно"
+        buttons.append([
+            InlineKeyboardButton(
+                text=f"Группа {g['name']} ({teacher_label})",
+                callback_data=f"select_group:{g['id']}"
+            )
+        ])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 

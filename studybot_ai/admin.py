@@ -43,7 +43,12 @@ from studybot_ai.ai_client import generate_study_pack
 
 load_environment()
 
-load_environment()
+app = Flask(
+    __name__,
+    template_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "templates_ai")),
+    static_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "static_ai"))
+)
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev-secret-key-123")
 
 def get_bot_username() -> str:
     """
@@ -256,10 +261,11 @@ def register():
         
     if request.method == "POST":
         email = request.form.get("email", "").strip().lower()
+        full_name = request.form.get("full_name", "").strip()
         password = request.form.get("password", "")
         confirm_password = request.form.get("confirm_password", "")
         
-        if not email or not password:
+        if not email or not full_name or not password:
             flash("Пожалуйста, заполните все поля.", "error")
             return render_template("register.html")
             
@@ -279,6 +285,7 @@ def register():
         code = f"{random.randint(100000, 999999)}"
         session["registration_data"] = {
             "email": email,
+            "full_name": full_name,
             "password_hash": generate_password_hash(password),
             "code": code
         }
@@ -303,7 +310,7 @@ def verify():
     if request.method == "POST":
         input_code = request.form.get("code", "").strip()
         if input_code == reg_data["code"]:
-            teacher_id = create_teacher(reg_data["email"], reg_data["password_hash"])
+            teacher_id = create_teacher(reg_data["email"], reg_data["password_hash"], reg_data.get("full_name"))
             session.pop("registration_data", None)
             session["teacher_id"] = teacher_id
             flash("Регистрация успешно подтверждена!", "success")

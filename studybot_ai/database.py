@@ -51,6 +51,7 @@ def init_db() -> None:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 email TEXT NOT NULL UNIQUE,
                 password_hash TEXT NOT NULL,
+                full_name TEXT,
                 created_at TEXT NOT NULL
             );
 
@@ -124,19 +125,30 @@ def init_db() -> None:
             );
             """
         )
+        
+        # Миграция: Добавление колонки full_name в таблицу teachers, если её там нет
+        try:
+            connection.execute("SELECT full_name FROM teachers LIMIT 1")
+        except sqlite3.OperationalError:
+            connection.execute("ALTER TABLE teachers ADD COLUMN full_name TEXT")
 
 
 # === Функции для работы с преподавателями (Teacher Functions) ===
 
-def create_teacher(email: str, password_hash: str) -> int:
+def create_teacher(email: str, password_hash: str, full_name: str | None = None) -> int:
     """
     Записывает учетную запись преподавателя в БД.
     Пароль сохраняется исключительно в захешированном виде.
     """
     with get_connection() as connection:
         cursor = connection.execute(
-            "INSERT INTO teachers (email, password_hash, created_at) VALUES (?, ?, ?)",
-            (email.strip().lower(), password_hash, datetime.now().isoformat(timespec="seconds")),
+            "INSERT INTO teachers (email, password_hash, full_name, created_at) VALUES (?, ?, ?, ?)",
+            (
+                email.strip().lower(),
+                password_hash,
+                full_name.strip() if full_name else None,
+                datetime.now().isoformat(timespec="seconds")
+            ),
         )
         return cursor.lastrowid
 
@@ -190,10 +202,17 @@ def list_groups(teacher_id: int) -> list[dict]:
 
 def list_all_groups() -> list[dict]:
     """
-    Возвращает список вообще всех групп в БД (используется студентами при регистрации в боте).
+    Возвращает список вообще всех групп в БД с информацией об учителе (используется студентами при регистрации в боте).
     """
     with get_connection() as connection:
-        return connection.execute("SELECT * FROM groups ORDER BY name").fetchall()
+        return connection.execute(
+            """
+            SELECT groups.*, teachers.full_name AS teacher_name, teachers.email AS teacher_email
+            FROM groups
+            JOIN teachers ON groups.teacher_id = teachers.id
+            ORDER BY groups.name
+            """
+        ).fetchall()
 
 
 def get_group(group_id: int) -> dict | None:

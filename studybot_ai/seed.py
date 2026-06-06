@@ -34,7 +34,7 @@ def main() -> None:
     teacher = get_teacher_by_email(email)
     if not teacher:
         # Пароль соответствует требованиям сложности (Password123!)
-        teacher_id = create_teacher(email, generate_password_hash("Password123!"))
+        teacher_id = create_teacher(email, generate_password_hash("Password123!"), "Иван Иванов")
         print(f"Teacher created: {email} (Password: Password123!)")
     else:
         teacher_id = teacher["id"]
