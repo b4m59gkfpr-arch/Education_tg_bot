@@ -49,6 +49,7 @@ app = Flask(
     static_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "static_ai"))
 )
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev-secret-key-123")
+init_db()
 
 def get_bot_username() -> str:
     """
