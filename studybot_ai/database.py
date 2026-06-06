@@ -8,15 +8,26 @@ from pathlib import Path
 from typing import Iterator
 
 
+# Путь к локальному файлу базы данных SQLite
 DB_PATH = Path(os.getenv("STUDYBOT_AI_DB", "data/studybot_ai.db"))
 
 
 def _row_factory(cursor: sqlite3.Cursor, row: tuple) -> dict:
+    """
+    Преобразует кортеж результатов SQL-запроса в ассоциативный словарь (словарь ключ-значение),
+    где ключами являются названия колонок таблицы.
+    """
     return {column[0]: row[index] for index, column in enumerate(cursor.description)}
 
 
 @contextmanager
 def get_connection() -> Iterator[sqlite3.Connection]:
+    """
+    Контекстный менеджер для управления соединениями с СУБД SQLite.
+    - Автоматически создает папку базы данных, если она отсутствует.
+    - Принудительно включает поддержку ограничений внешних ключей (PRAGMA foreign_keys = ON).
+    - При успешном выполнении автоматически фиксирует изменения (commit), при ошибке — закрывает соединение.
+    """
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(DB_PATH)
     connection.row_factory = _row_factory
@@ -29,6 +40,10 @@ def get_connection() -> Iterator[sqlite3.Connection]:
 
 
 def init_db() -> None:
+    """
+    Инициализирует реляционную схему данных.
+    Создает все необходимые таблицы, индексы и ограничения внешних ключей, если они не существуют.
+    """
     with get_connection() as connection:
         connection.executescript(
             """
@@ -111,8 +126,13 @@ def init_db() -> None:
         )
 
 
-# Teacher Functions
+# === Функции для работы с преподавателями (Teacher Functions) ===
+
 def create_teacher(email: str, password_hash: str) -> int:
+    """
+    Записывает учетную запись преподавателя в БД.
+    Пароль сохраняется исключительно в захешированном виде.
+    """
     with get_connection() as connection:
         cursor = connection.execute(
             "INSERT INTO teachers (email, password_hash, created_at) VALUES (?, ?, ?)",
@@ -122,6 +142,9 @@ def create_teacher(email: str, password_hash: str) -> int:
 
 
 def get_teacher_by_email(email: str) -> dict | None:
+    """
+    Выбирает запись преподавателя по его электронной почте (для входа в админку).
+    """
     with get_connection() as connection:
         return connection.execute(
             "SELECT * FROM teachers WHERE email = ?",
@@ -130,6 +153,9 @@ def get_teacher_by_email(email: str) -> dict | None:
 
 
 def get_teacher_by_id(teacher_id: int) -> dict | None:
+    """
+    Выбирает запись преподавателя по его первичному ключу (для валидации куки/сессии).
+    """
     with get_connection() as connection:
         return connection.execute(
             "SELECT * FROM teachers WHERE id = ?",
@@ -137,8 +163,12 @@ def get_teacher_by_id(teacher_id: int) -> dict | None:
         ).fetchone()
 
 
-# Group Functions
+# === Функции для работы с группами (Group Functions) ===
+
 def create_group(name: str, teacher_id: int) -> int:
+    """
+    Создает новую учебную группу, привязанную к аккаунту преподавателя.
+    """
     with get_connection() as connection:
         cursor = connection.execute(
             "INSERT INTO groups (name, teacher_id, created_at) VALUES (?, ?, ?)",
@@ -148,6 +178,9 @@ def create_group(name: str, teacher_id: int) -> int:
 
 
 def list_groups(teacher_id: int) -> list[dict]:
+    """
+    Возвращает список всех групп, созданных данным преподавателем.
+    """
     with get_connection() as connection:
         return connection.execute(
             "SELECT * FROM groups WHERE teacher_id = ? ORDER BY name",
@@ -156,11 +189,17 @@ def list_groups(teacher_id: int) -> list[dict]:
 
 
 def list_all_groups() -> list[dict]:
+    """
+    Возвращает список вообще всех групп в БД (используется студентами при регистрации в боте).
+    """
     with get_connection() as connection:
         return connection.execute("SELECT * FROM groups ORDER BY name").fetchall()
 
 
 def get_group(group_id: int) -> dict | None:
+    """
+    Выбирает информацию о группе по её первичному ключу.
+    """
     with get_connection() as connection:
         return connection.execute(
             "SELECT * FROM groups WHERE id = ?",
@@ -168,8 +207,13 @@ def get_group(group_id: int) -> dict | None:
         ).fetchone()
 
 
-# Student User Functions
+# === Функции для работы со студентами (Student User Functions) ===
+
 def get_or_create_user(telegram_id: int, username: str | None) -> dict:
+    """
+    Ищет запись студента по его Telegram ID. 
+    Если студент не найден — создает новую запись с пустыми полями группы и ФИО.
+    """
     with get_connection() as connection:
         user = connection.execute(
             "SELECT * FROM users WHERE telegram_id = ?",
@@ -189,6 +233,9 @@ def get_or_create_user(telegram_id: int, username: str | None) -> dict:
 
 
 def update_user_group_and_name(telegram_id: int, group_id: int, full_name: str) -> None:
+    """
+    Сохраняет выбор учебной группы и ФИО студента при прохождении регистрации в Telegram-боте.
+    """
     with get_connection() as connection:
         connection.execute(
             "UPDATE users SET group_id = ?, full_name = ? WHERE telegram_id = ?",
@@ -197,6 +244,9 @@ def update_user_group_and_name(telegram_id: int, group_id: int, full_name: str) 
 
 
 def clear_user_group(telegram_id: int) -> None:
+    """
+    Сбрасывает привязку студента к группе и его имя (выход из группы или сброс при удалении группы).
+    """
     with get_connection() as connection:
         connection.execute(
             "UPDATE users SET group_id = NULL, full_name = NULL WHERE telegram_id = ?",
@@ -204,8 +254,13 @@ def clear_user_group(telegram_id: int) -> None:
         )
 
 
-# Subject Functions
+
+# === Функции для работы с предметами (Subject Functions) ===
+
 def list_subjects(group_id: int | None = None) -> list[dict]:
+    """
+    Возвращает список предметов. Если передан group_id, фильтрует по учебной группе.
+    """
     query = "SELECT * FROM subjects"
     params = []
     if group_id is not None:
@@ -217,11 +272,18 @@ def list_subjects(group_id: int | None = None) -> list[dict]:
 
 
 def get_subject(subject_id: int) -> dict | None:
+    """
+    Выбирает предмет по его уникальному ID.
+    """
     with get_connection() as connection:
         return connection.execute("SELECT * FROM subjects WHERE id = ?", (subject_id,)).fetchone()
 
 
 def add_subject(name: str, group_id: int) -> None:
+    """
+    Добавляет новый предмет в базу данных с привязкой к конкретной группе.
+    Игнорирует добавление, если предмет с таким именем в группе уже существует.
+    """
     with get_connection() as connection:
         connection.execute(
             "INSERT OR IGNORE INTO subjects (name, group_id) VALUES (?, ?)",
@@ -229,8 +291,12 @@ def add_subject(name: str, group_id: int) -> None:
         )
 
 
-# Question Functions
+# === Функции для работы с вопросами (Question Functions) ===
+
 def list_questions(subject_id: int | None = None, group_id: int | None = None, limit: int | None = None) -> list[dict]:
+    """
+    Выбирает список тестовых вопросов. Поддерживает фильтрацию по предмету, группе и лимит записей.
+    """
     query = """
         SELECT questions.*, subjects.name AS subject_name
         FROM questions
@@ -268,6 +334,9 @@ def add_question(
     option_d: str,
     correct_answer: str,
 ) -> None:
+    """
+    Сохраняет новый сгенерированный ИИ вопрос с 4 вариантами ответов и указанием верного в БД.
+    """
     with get_connection() as connection:
         connection.execute(
             """
@@ -288,8 +357,12 @@ def add_question(
         )
 
 
-# Notes Functions
+# === Функции для работы с конспектами (Notes Functions) ===
+
 def list_notes(subject_id: int | None = None, group_id: int | None = None) -> list[dict]:
+    """
+    Выбирает конспекты лекций для предмета или группы, сортируя по новизне.
+    """
     query = """
         SELECT notes.*, subjects.name AS subject_name
         FROM notes
@@ -315,6 +388,9 @@ def list_notes(subject_id: int | None = None, group_id: int | None = None) -> li
 
 
 def add_note(subject_id: int, title: str, content: str) -> None:
+    """
+    Добавляет сгенерированный конспект лекции в БД.
+    """
     with get_connection() as connection:
         connection.execute(
             "INSERT INTO notes (subject_id, title, content) VALUES (?, ?, ?)",
@@ -322,8 +398,12 @@ def add_note(subject_id: int, title: str, content: str) -> None:
         )
 
 
-# Results / Stats Functions
+# === Функции результатов и статистики (Results / Stats Functions) ===
+
 def save_result(telegram_id: int, subject_id: int, score: int, total_questions: int) -> None:
+    """
+    Сохраняет результаты тестирования студента.
+    """
     with get_connection() as connection:
         user = connection.execute(
             "SELECT id FROM users WHERE telegram_id = ?",
@@ -342,6 +422,10 @@ def save_result(telegram_id: int, subject_id: int, score: int, total_questions: 
 
 
 def get_user_stats(telegram_id: int) -> dict:
+    """
+    Агрегирует статистику тестов конкретного студента по его текущей группе.
+    Возвращает количество попыток, средний и лучший процент прохождения.
+    """
     with get_connection() as connection:
         user = connection.execute(
             "SELECT id, group_id FROM users WHERE telegram_id = ?",
@@ -371,8 +455,12 @@ def get_user_stats(telegram_id: int) -> dict:
     }
 
 
-# Dashboard Counts
+# === Функции для сводки дашборда (Dashboard Counts) ===
+
 def dashboard_counts(group_id: int | None = None) -> dict:
+    """
+    Считает количество сущностей в рамках группы для отображения на панелях статистики.
+    """
     if group_id is None:
         return {"subjects": 0, "questions": 0, "notes": 0, "users": 0, "results": 0, "generated_tests": 0}
 
@@ -411,7 +499,8 @@ def dashboard_counts(group_id: int | None = None) -> dict:
         }
 
 
-# Generated Tests
+# === Функции логов генераций ИИ (Generated Tests) ===
+
 def save_generated_test(
     subject_id: int,
     title: str,
@@ -419,6 +508,9 @@ def save_generated_test(
     generated_note: str,
     questions_json: str,
 ) -> int:
+    """
+    Сохраняет историю генерации теста ИИ (для последующего просмотра преподавателем).
+    """
     with get_connection() as connection:
         cursor = connection.execute(
             """
@@ -440,6 +532,9 @@ def save_generated_test(
 
 
 def list_generated_tests(group_id: int | None = None) -> list[dict]:
+    """
+    Возвращает список всех когда-либо сгенерированных ИИ тестов для группы.
+    """
     query = """
         SELECT generated_tests.*, subjects.name AS subject_name
         FROM generated_tests
@@ -456,6 +551,9 @@ def list_generated_tests(group_id: int | None = None) -> list[dict]:
 
 
 def get_generated_test(generated_test_id: int) -> dict | None:
+    """
+    Возвращает детальные данные генерации теста ИИ по ID.
+    """
     with get_connection() as connection:
         return connection.execute(
             """
@@ -468,29 +566,39 @@ def get_generated_test(generated_test_id: int) -> dict | None:
         ).fetchone()
 
 
+# === Функции удаления (Delete Handlers) ===
+
 def delete_generated_test(test_id: int) -> None:
+    """Удаляет запись лога генерации теста."""
     with get_connection() as connection:
         connection.execute("DELETE FROM generated_tests WHERE id = ?", (test_id,))
 
 
 def delete_question(question_id: int) -> None:
+    """Удаляет тестовый вопрос."""
     with get_connection() as connection:
         connection.execute("DELETE FROM questions WHERE id = ?", (question_id,))
 
 
 def delete_subject(subject_id: int) -> None:
+    """Удаляет предмет. Включает каскадное удаление конспектов/тестов на уровне СУБД."""
     with get_connection() as connection:
         connection.execute("DELETE FROM subjects WHERE id = ?", (subject_id,))
 
 
 def delete_group(group_id: int) -> None:
+    """Удаляет учебную группу. Включает каскадные удаления и сбросы связей студентов."""
     with get_connection() as connection:
         connection.execute("DELETE FROM groups WHERE id = ?", (group_id,))
 
 
 def list_group_users(group_id: int) -> list[dict]:
+    """
+    Возвращает список студентов группы для вывода на веб-панель преподавателя.
+    """
     with get_connection() as connection:
         return connection.execute(
             "SELECT * FROM users WHERE group_id = ? ORDER BY full_name",
             (group_id,),
         ).fetchall()
+

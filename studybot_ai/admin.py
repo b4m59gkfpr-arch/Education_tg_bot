@@ -43,7 +43,14 @@ from studybot_ai.ai_client import generate_study_pack
 
 load_environment()
 
+load_environment()
+
 def get_bot_username() -> str:
+    """
+    Выполняет асинхронный HTTP-запрос к API Telegram (метод getMe), чтобы получить 
+    актуальный юзернейм бота для генерации инвайт-ссылок.
+    В случае ошибки возвращает дефолтный юзернейм.
+    """
     token = os.getenv("BOT_TOKEN")
     if not token:
         return "study_iitubot"
@@ -61,17 +68,13 @@ def get_bot_username() -> str:
     return "study_iitubot"
 
 
-app = Flask(
-    __name__,
-    template_folder=str(BASE_DIR / "templates_ai"),
-    static_folder=str(BASE_DIR / "static_ai"),
-)
-app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev-secret-key")
-init_db()
+# Декораторы защиты роутов и инъекция контекста
 
-
-# Decorators & Context Processors
 def login_required(f):
+    """
+    Декоратор для защиты эндпоинтов от неавторизованных пользователей.
+    Если преподаватель не авторизован (отсутствует в сессии), перенаправляет его на /login.
+    """
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if "teacher_id" not in session:
@@ -82,6 +85,10 @@ def login_required(f):
 
 
 def group_required(f):
+    """
+    Декоратор для защиты страниц, требующих наличие активной выбранной группы.
+    Если группа не выбрана, перенаправляет преподавателя на страницу выбора групп.
+    """
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if "teacher_id" not in session:
@@ -95,6 +102,11 @@ def group_required(f):
 
 @app.context_processor
 def inject_user_context():
+    """
+    Контекст-процессор Flask.
+    Автоматически добавляет юзернейм бота, почту преподавателя и имя активной группы 
+    во все рендеримые HTML-шаблоны для отображения в шапке и генерации ссылок.
+    """
     if not hasattr(app, "bot_username"):
         app.bot_username = get_bot_username()
 
@@ -118,8 +130,15 @@ def inject_user_context():
     return context
 
 
-# Password Validation
 def is_password_strong(password: str) -> bool:
+    """
+    Проверяет сложность пароля по критериям безопасности:
+    - Длина не менее 8 символов.
+    - Наличие строчной буквы.
+    - Наличие заглавной буквы.
+    - Наличие цифры.
+    - Наличие специального символа.
+    """
     if len(password) < 8:
         return False
     if not re.search(r"[a-z]", password):
@@ -131,6 +150,7 @@ def is_password_strong(password: str) -> bool:
     if not re.search(r"[@$!%*?&_#^+=~`|{};:'\",.<>/?\-\[\]\\]", password):
         return False
     return True
+
 
 
 # SMTP Code Sender
@@ -165,8 +185,13 @@ def send_verification_email(email: str, code: str) -> bool:
         return True  # Fallback to local logs without crashing
 
 
-# PDF Reader Helper
+# PDF Reader Helper (Вспомогательный метод чтения и нарезки PDF)
 def _read_material_from_request(start_page: int | None = None, end_page: int | None = None) -> str:
+    """
+    Извлекает текстовое содержимое из запроса (текстового поля или загруженного файла).
+    При загрузке PDF-файла считывает только указанный диапазон страниц (Selective PDF Reading),
+    конвертируя номера страниц из 1-indexed в 0-indexed индексы.
+    """
     material = request.form.get("material", "").strip()
     uploaded_file = request.files.get("material_file")
 
@@ -176,11 +201,13 @@ def _read_material_from_request(start_page: int | None = None, end_page: int | N
             import io
             from pypdf import PdfReader
             try:
+                # Читаем бинарный поток PDF из памяти без сохранения на диск
                 pdf_data = io.BytesIO(uploaded_file.read())
                 reader = PdfReader(pdf_data)
                 
                 total_pages = len(reader.pages)
                 
+                # Расчет начального индекса страницы (1-indexed в 0-indexed)
                 if start_page is not None and start_page > total_pages:
                     start_idx = total_pages
                 elif start_page is not None and start_page >= 1:
@@ -188,6 +215,7 @@ def _read_material_from_request(start_page: int | None = None, end_page: int | N
                 else:
                     start_idx = 0
                     
+                # Расчет конечного индекса страницы
                 if end_page is not None and end_page > total_pages:
                     end_idx = total_pages
                 elif end_page is not None and end_page >= 1:
@@ -195,11 +223,14 @@ def _read_material_from_request(start_page: int | None = None, end_page: int | N
                 else:
                     end_idx = total_pages
                 
+                # Защита от перевернутого диапазона (если старт > конец)
                 if start_idx > end_idx:
                     start_idx, end_idx = end_idx, start_idx
                 
                 text_parts = []
+                # Извлекаем текст только из разрешенного диапазона страниц
                 pages_to_read = reader.pages[start_idx:end_idx]
+
                 for page in pages_to_read:
                     text = page.extract_text()
                     if text:

@@ -9,6 +9,10 @@ from studybot_ai.config import get_env, get_required_env
 
 
 def _extract_json(text: str) -> dict:
+    """
+    Извлекает JSON-строку из ответа нейросети.
+    Очищает маркеры разметки markdown (```json ... ```) и парсит текст в словарь.
+    """
     cleaned = text.strip()
     cleaned = re.sub(r"^```json\s*", "", cleaned)
     cleaned = re.sub(r"^```\s*", "", cleaned)
@@ -17,22 +21,27 @@ def _extract_json(text: str) -> dict:
     try:
         return json.loads(cleaned)
     except json.JSONDecodeError:
+        # Резервный поиск первого вхождения фигурных скобок с помощью регулярного выражения
         match = re.search(r"\{.*\}", cleaned, flags=re.DOTALL)
         if not match:
-            raise ValueError("Gemini did not return JSON.")
+            raise ValueError("LLM did not return JSON.")
         return json.loads(match.group(0))
 
 
 def _validate_pack(data: dict) -> dict:
+    """
+    Выполняет жесткую проверку структуры данных (Schema Validation).
+    Проверяет наличие полей note_title, note_content и валидность структуры вопросов.
+    """
     if not isinstance(data.get("note_title"), str) or not data["note_title"].strip():
-        raise ValueError("Gemini response does not contain note_title.")
+        raise ValueError("LLM response does not contain note_title.")
 
     if not isinstance(data.get("note_content"), str) or not data["note_content"].strip():
-        raise ValueError("Gemini response does not contain note_content.")
+        raise ValueError("LLM response does not contain note_content.")
 
     questions = data.get("questions")
     if not isinstance(questions, list) or not questions:
-        raise ValueError("Gemini response does not contain questions.")
+        raise ValueError("LLM response does not contain questions.")
 
     normalized_questions = []
     for item in questions:
@@ -58,9 +67,10 @@ def _validate_pack(data: dict) -> dict:
             }
         )
 
+    # Убеждаемся, что ни одно поле не является пустым
     for question in normalized_questions:
         if not all(question.values()):
-            raise ValueError("Gemini returned an incomplete question.")
+            raise ValueError("LLM returned an incomplete question structure.")
 
     return {
         "note_title": data["note_title"].strip(),
@@ -70,14 +80,21 @@ def _validate_pack(data: dict) -> dict:
 
 
 def generate_study_pack(subject_name: str, material: str, question_count: int) -> dict:
+    """
+    Генерирует конспект и тесты по заданной теме и лекции.
+    Использует Groq Cloud API (Llama 3.3). 
+    В случае отсутствия ключа или ошибки сети переключается на встроенный генератор-заглушку (Mock).
+    """
     api_key = get_env("GROQ_API_KEY", "").strip()
     model = get_env("GROQ_MODEL", "llama-3.3-70b-versatile")
 
     use_mock = False
+    # Проверка валидности API-ключа
     if not api_key or not api_key.startswith("gsk_"):
         use_mock = True
 
     if not use_mock:
+        # Промпт-инжиниринг: заставляем ИИ отвечать только в JSON и отсеивать «мусорные» разделы лекций
         prompt = f"""
 You are helping build an exam preparation Telegram bot.
 
@@ -124,9 +141,11 @@ Material:
                     "content": prompt,
                 }
             ],
+            # Требуем от API возвращать валидный JSON-объект
             "response_format": {
                 "type": "json_object"
             },
+            # Низкая температура 0.3 для снижения креативности модели и точного следования материалу
             "temperature": 0.3,
         }
 
@@ -143,6 +162,7 @@ Material:
         )
 
         try:
+            # Асинхронно-подобное синхронное чтение через urllib с таймаутом
             with urllib.request.urlopen(request, timeout=60) as response:
                 response_data = json.loads(response.read().decode("utf-8"))
             text = response_data["choices"][0]["message"]["content"]
@@ -152,8 +172,9 @@ Material:
             use_mock = True
 
     if use_mock:
+        # Резервный эвристический генератор-заглушка на случай сбоя API
         import random
-        # Heuristic sentences from material
+        # Разделяем исходный текст на отдельные предложения
         sentences = [s.strip() for s in re.split(r"[.!?\n]", material) if len(s.strip()) > 10]
         if not sentences:
             sentences = [material.strip()]
@@ -190,3 +211,4 @@ Material:
             "note_content": f"Краткий обзор материала:\n\n{material[:800]}...",
             "questions": questions,
         }
+

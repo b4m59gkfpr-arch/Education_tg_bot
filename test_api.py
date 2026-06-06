@@ -1,13 +1,15 @@
 import urllib.request
 import urllib.error
 import json
-
 import os
 from studybot_ai.config import load_environment
+
+# Загружаем переменные окружения из файла .env
 load_environment()
 key = os.getenv("GROQ_API_KEY", "")
 url = "https://api.groq.com/openai/v1/chat/completions"
 
+# Тестовый запрос для проверки соединения с Groq Cloud API
 payload = {
     "model": "llama-3.3-70b-versatile",
     "messages": [
@@ -16,6 +18,7 @@ payload = {
     "temperature": 0.3
 }
 
+# Формируем сырой HTTP-запрос по спецификации OpenAI-совместимого API
 req = urllib.request.Request(
     url,
     data=json.dumps(payload).encode("utf-8"),
@@ -28,6 +31,7 @@ req = urllib.request.Request(
 )
 
 try:
+    # Отправляем запрос и выводим ответ модели в консоль для быстрой диагностики
     resp = urllib.request.urlopen(req, timeout=30)
     data = json.loads(resp.read().decode("utf-8"))
     print("SUCCESS:", data["choices"][0]["message"]["content"])
@@ -37,3 +41,4 @@ except urllib.error.HTTPError as e:
     print("Response:", body[:500])
 except Exception as e:
     print(f"Error: {e}")
+
